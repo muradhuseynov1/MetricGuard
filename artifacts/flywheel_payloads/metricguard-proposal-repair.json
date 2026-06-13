@@ -1,7 +1,7 @@
 {
   "local_temp_node_id": "metricguard-proposal-repair",
   "parent_ids": [
-    "f4f092b3-46c2-55f2-b86b-9e1effc777cb"
+    "b4e4c2b7-f000-54a5-a4e4-359293d85a0d"
   ],
   "staged_payload": {
     "title": "Blue repair: legitimate threshold change",

@@ -72,6 +72,7 @@ class LocalGraph:
 @dataclass(frozen=True)
 class FlywheelConfig:
     root_node_id: str | None = None
+    chain_from_last_accepted: bool = True
     updated_by: str = "MetricGuard"
     repo_url: str | None = None
     branch_name: str | None = None
@@ -84,6 +85,10 @@ class FlywheelConfig:
         _load_dotenv(Path(__file__).resolve().parents[1] / ".env")
         return cls(
             root_node_id=os.environ.get("FLYWHEEL_ROOT_NODE_ID"),
+            chain_from_last_accepted=os.environ.get(
+                "FLYWHEEL_CHAIN_FROM_LAST_ACCEPTED", "1"
+            ).strip().lower()
+            not in {"0", "false", "no"},
             updated_by=os.environ.get("FLYWHEEL_UPDATED_BY", "MetricGuard"),
             repo_url=os.environ.get("FLYWHEEL_REPO_URL"),
             branch_name=os.environ.get("FLYWHEEL_BRANCH_NAME"),
@@ -107,6 +112,7 @@ class FlywheelGraph(LocalGraph):
         self._create_node = create_node or self._create_node_with_cli
         self.sync_events: list[dict[str, Any]] = []
         self.local_to_flywheel: dict[str, str] = {}
+        self.run_parent_node_id = self._resolve_run_parent_node_id()
 
     def write(self) -> None:
         super().write()
@@ -170,9 +176,31 @@ class FlywheelGraph(LocalGraph):
                     f"cannot create {node.id}: parent {node.parent_id} was not synced"
                 )
             return [parent_node_id]
-        if self.config.root_node_id:
-            return [self.config.root_node_id]
+        if self.run_parent_node_id:
+            return [self.run_parent_node_id]
         return []
+
+    def _resolve_run_parent_node_id(self) -> str | None:
+        if not self.config.chain_from_last_accepted:
+            return self.config.root_node_id
+        previous_accepted = self._previous_accepted_node_id()
+        return previous_accepted or self.config.root_node_id
+
+    def _previous_accepted_node_id(self) -> str | None:
+        sync_path = self.artifacts_dir / "flywheel_sync.json"
+        if not sync_path.exists():
+            return None
+        try:
+            report = json.loads(sync_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return None
+        if not report.get("ok"):
+            return None
+        mapping = report.get("local_to_flywheel")
+        if not isinstance(mapping, dict):
+            return None
+        accepted_node_id = mapping.get("audit-accepted")
+        return str(accepted_node_id) if accepted_node_id else None
 
     def _node_payload(self, node: GraphNode, parent_ids: list[str]) -> dict[str, Any]:
         content_lines = [
@@ -242,6 +270,8 @@ class FlywheelGraph(LocalGraph):
         report = {
             "backend": "flywheel-cli",
             "root_node_id": self.config.root_node_id,
+            "run_parent_node_id": self.run_parent_node_id,
+            "chain_from_last_accepted": self.config.chain_from_last_accepted,
             "ok": bool(self.sync_events) and all(event["ok"] for event in self.sync_events),
             "local_to_flywheel": self.local_to_flywheel,
             "events": self.sync_events,

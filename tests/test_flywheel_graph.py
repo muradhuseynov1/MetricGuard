@@ -91,6 +91,46 @@ class FlywheelGraphTests(unittest.TestCase):
             self.assertIn("## LLM Judge Explanation", content)
             self.assertIn("modified `evaluate.py`", content)
 
+    def test_root_node_attaches_to_previous_accepted_audit_when_sync_report_exists(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def fake_create(payload: dict[str, object]) -> dict[str, object]:
+            calls.append(payload)
+            local_id = str(payload["local_temp_node_id"]).replace("metricguard-", "")
+            return {"node": {"node_id": f"fw-{local_id}"}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts_dir = Path(tmp)
+            (artifacts_dir / "flywheel_sync.json").write_text(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "local_to_flywheel": {
+                            "baseline": "old-baseline",
+                            "audit-accepted": "previous-accepted-node",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            graph = FlywheelGraph(
+                artifacts_dir,
+                FlywheelConfig(root_node_id="root-node", chain_from_last_accepted=True),
+                create_node=fake_create,
+            )
+
+            graph.add_node(
+                kind="baseline",
+                title="Baseline trusted benchmark",
+                status="accepted",
+                summary="Trusted baseline accuracy: 60.00%",
+                artifacts=["baseline_metrics.json"],
+            )
+
+            graph.write()
+
+            self.assertEqual(calls[0]["parent_ids"], ["previous-accepted-node"])
+
 
 if __name__ == "__main__":
     unittest.main()

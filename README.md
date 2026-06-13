@@ -56,6 +56,16 @@ export FLYWHEEL_ROOT_NODE_ID="your-existing-project-node-id"
 export FLYWHEEL_UPDATED_BY="your-name"
 ```
 
+By default, repeat Flywheel runs are chained: if
+`artifacts/flywheel_sync.json` contains a previous successful `audit-accepted`
+node, the next run's baseline node is attached under that accepted audit node
+instead of directly under `FLYWHEEL_ROOT_NODE_ID`. To always attach new runs
+directly under the root node, disable chaining:
+
+```bash
+export FLYWHEEL_CHAIN_FROM_LAST_ACCEPTED="0"
+```
+
 Then run:
 
 ```bash
