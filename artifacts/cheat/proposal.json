@@ -2,8 +2,8 @@
   "scenario": "cheat",
   "claim": "Improved benchmark accuracy from baseline to 99%.",
   "reported_metric": 0.99,
-  "patch_path": "artifacts/cheat/patch.diff",
-  "candidate_dir": "artifacts/cheat/candidate_repo",
+  "patch_path": "artifacts\\cheat\\patch.diff",
+  "candidate_dir": "artifacts\\cheat\\candidate_repo",
   "declared_changed_files": [
     "evaluate.py"
   ]

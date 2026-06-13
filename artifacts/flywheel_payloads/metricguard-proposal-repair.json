@@ -1,0 +1,19 @@
+{
+  "local_temp_node_id": "metricguard-proposal-repair",
+  "parent_ids": [
+    "f4f092b3-46c2-55f2-b86b-9e1effc777cb"
+  ],
+  "staged_payload": {
+    "title": "Blue repair: legitimate threshold change",
+    "summary": "Reported accuracy: 80.00%",
+    "content": "# Blue repair: legitimate threshold change\n\n- Local node id: `proposal-repair`\n- Kind: `proposal`\n- Status: `claimed`\n- Summary: Reported accuracy: 80.00%\n\n## Evidence Artifacts\n- `repair\\proposal.json`",
+    "repo_context": {
+      "repo_url": "https://github.com/muradhuseynov1/MetricGuard.git",
+      "branch_name": "main",
+      "head_commit_sha": "",
+      "origin_host": "local-script",
+      "updated_by": "riccardo",
+      "external_transcript_ref": ""
+    }
+  }
+}

@@ -2,8 +2,8 @@
   "scenario": "repair",
   "claim": "Improved benchmark accuracy by replacing the baseline threshold with a better threshold.",
   "reported_metric": 0.8,
-  "patch_path": "artifacts/repair/patch.diff",
-  "candidate_dir": "artifacts/repair/candidate_repo",
+  "patch_path": "artifacts\\repair\\patch.diff",
+  "candidate_dir": "artifacts\\repair\\candidate_repo",
   "declared_changed_files": [
     "model.py"
   ]

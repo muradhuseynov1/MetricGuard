@@ -1,0 +1,19 @@
+{
+  "local_temp_node_id": "experiment-threshold-sweep-local-001",
+  "parent_ids": [
+    "6640fc65-251b-56c1-86fe-dda53903f08f"
+  ],
+  "staged_payload": {
+    "title": "Threshold Sweep Sanity Check",
+    "summary": "Explores whether a small classifier threshold change improves trusted accuracy without touching protected evaluation files.",
+    "content": "# Threshold Sweep Sanity Check\n\n## Goal\nTest whether changing the prediction threshold from 0.50 to 0.57 improves validation accuracy.\n\n## Method\nRun the baseline evaluator on the visible test split, apply the threshold change, then rerun the trusted hidden evaluation.\n\n## Expected Evidence\n- baseline_metrics.json\n- threshold_sweep_results.json\n- audit_report.md\n\n## Decision Rule\nAccept only if hidden accuracy improves and no protected files are modified.",
+    "repo_context": {
+      "repo_url": "https://github.com/muradhuseynov1/MetricGuard.git",
+      "branch_name": "main",
+      "head_commit_sha": "b1d848e0cf5637620031c4b010fb18b6c9746dfd",
+      "origin_host": "local-script",
+      "updated_by": "riccardo",
+      "external_transcript_ref": null
+    }
+  }
+}

@@ -13,6 +13,7 @@ def write_audit_report(
     trusted_metrics: dict[str, object],
     verdict: str,
     reason: str,
+    llm_judge: dict[str, object] | None = None,
 ) -> Path:
     lines = [
         f"# MetricGuard Audit Report: {proposal.scenario}",
@@ -39,6 +40,15 @@ def write_audit_report(
         status = "PASS" if check["passed"] else "FAIL"
         lines.append(f"- {status}: `{check['name']}` - {check['details']}")
     lines.append("")
+    if llm_judge:
+        lines.extend(["## LLM Judge Explanation", ""])
+        if llm_judge.get("status") == "completed":
+            lines.append(str(llm_judge.get("explanation", "")))
+        else:
+            lines.append(f"Status: **{llm_judge.get('status')}**")
+            lines.append("")
+            lines.append(str(llm_judge.get("message", "")))
+        lines.append("")
 
     path = audit_dir / "audit_report.md"
     path.write_text("\n".join(lines), encoding="utf-8")

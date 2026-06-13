@@ -17,28 +17,43 @@ The demo creates:
 - one cheating claim that is rejected
 - one repaired claim that is accepted
 - evidence artifacts under `artifacts/`
+- optional LLM judge explanation artifacts when `OPENAI_API_KEY` is configured
 - a local fallback graph in `artifacts/local_graph.json` and
   `artifacts/local_graph.md`
 
 No third-party packages are required.
 
+## Optional LLM Judge Explanation
+
+MetricGuard's final verdict is always deterministic. If `OPENAI_API_KEY` is
+configured, the audit also asks an LLM to write a concise judge-facing
+explanation of the evidence. The explanation is written to `llm_judge.json`,
+`llm_judge.md`, and included in `audit_report.md`.
+
+```bash
+export OPENAI_API_KEY="your-key"
+export METRICGUARD_LLM_JUDGE_MODEL="gpt-5.5"
+```
+
+If no API key is configured, the demo still runs and records the LLM judge
+artifact as skipped.
+
 ## Optional Live Flywheel Graph
 
 The demo always writes the local fallback graph. To also sync live graph nodes
-and edges to Flywheel, either export these variables or put them in a local `.env`
-file copied from `.env.example`:
+to Flywheel, configure the Flywheel CLI once:
 
 ```bash
-export FLYWHEEL_API_BASE_URL="https://your-flywheel-api.example.com"
-export FLYWHEEL_API_TOKEN="your-token"
-export FLYWHEEL_PROJECT_ID="your-project-id"
+npx --yes @paradigma-inc/flywheel setup --mode cli
+flywheel auth:status
 ```
 
-If your Flywheel API uses project-scoped paths, override the endpoint templates:
+Then either export these variables or put them in a local `.env` file copied
+from `.env.example`:
 
 ```bash
-export FLYWHEEL_NODES_PATH="/projects/{project_id}/nodes"
-export FLYWHEEL_EDGES_PATH="/projects/{project_id}/edges"
+export FLYWHEEL_ROOT_NODE_ID="your-existing-project-node-id"
+export FLYWHEEL_UPDATED_BY="your-name"
 ```
 
 Then run:
@@ -47,6 +62,9 @@ Then run:
 python3 demo.py --scenario cheating_then_repair --graph-backend flywheel
 ```
 
-Sync results are written to `artifacts/flywheel_sync.json`. If the API is not
-configured, `--graph-backend auto` keeps using the local graph only.
+Sync results are written to `artifacts/flywheel_sync.json`. Payloads sent to
+the CLI are written to `artifacts/flywheel_payloads/`. If `FLYWHEEL_ROOT_NODE_ID`
+is configured, the baseline node is created under that Flywheel project node.
+Child proposal and audit nodes are connected through Flywheel parent IDs
+returned by earlier `flywheel nodes:commit-new` calls.
 

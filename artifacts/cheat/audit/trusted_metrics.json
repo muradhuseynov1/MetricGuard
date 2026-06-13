@@ -4,7 +4,7 @@
   "trusted_metric": 0.6,
   "delta_reported_vs_trusted": 0.39,
   "baseline_metric": 0.6,
-  "evaluator_hash": "f488ff019887e33ad4619798c4ff2b49c580b336e973e088dd001d5230516647",
+  "evaluator_hash": "793c847d36f646ff7dd2ba120882ba30daf23f8cce3fc3966580c2eb50011b5c",
   "correct": 6,
   "total": 10
 }

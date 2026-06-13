@@ -1,0 +1,19 @@
+{
+  "local_temp_node_id": "metricguard-proposal-cheat",
+  "parent_ids": [
+    "f4f092b3-46c2-55f2-b86b-9e1effc777cb"
+  ],
+  "staged_payload": {
+    "title": "Blue claim: dramatic improvement",
+    "summary": "Reported accuracy: 99.00%",
+    "content": "# Blue claim: dramatic improvement\n\n- Local node id: `proposal-cheat`\n- Kind: `proposal`\n- Status: `claimed`\n- Summary: Reported accuracy: 99.00%\n\n## Evidence Artifacts\n- `cheat\\proposal.json`",
+    "repo_context": {
+      "repo_url": "https://github.com/muradhuseynov1/MetricGuard.git",
+      "branch_name": "main",
+      "head_commit_sha": "",
+      "origin_host": "local-script",
+      "updated_by": "riccardo",
+      "external_transcript_ref": ""
+    }
+  }
+}
