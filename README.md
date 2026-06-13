@@ -32,23 +32,6 @@ Run the same pipeline and sync it to Flywheel:
 python demo.py --scenario citation_validation_pipeline --live-citation-checks --graph-backend flywheel-cli
 ```
 
-Expected output:
-
-```text
-Citation repair: REJECTED then ACCEPTED
-Synthetic benchmark: 6/6 (100.0%)
-External SciFact subset: 9/9 (100.0%)
-```
-
-The pipeline creates this graph shape:
-
-```text
-fabricated citation -> rejected audit
-repaired citation -> accepted audit
-accepted audit -> synthetic benchmark
-synthetic benchmark -> external SciFact subset
-```
-
 ## Scenarios
 
 | Scenario | Purpose |
@@ -229,45 +212,6 @@ python demo.py --scenario external_scifact_subset --graph-backend flywheel-cli -
 
 The full pipeline usually does not need manual parent IDs because it creates the
 accepted node and later benchmark branches in one run.
-
-## Repository Layout
-
-```text
-MetricGuard/
-|-- demo.py
-|-- README.md
-|-- metricguard/
-|   |-- citations.py
-|   |-- citation_benchmark.py
-|   |-- external_scifact.py
-|   |-- flywheel_graph.py
-|   |-- red_auditor.py
-|   |-- trusted_eval.py
-|   `-- ...
-|-- toy_repo/
-|-- trusted_assets/
-|-- benchmarks/
-|   `-- external_scifact_subset.jsonl
-`-- artifacts/
-```
-
-## Key Artifacts
-
-Typical evidence files:
-
-```text
-proposal.json
-patch.diff
-extracted_citations.json
-deterministic_verification.json
-live_citation_resolution.json
-judge_report.md
-audit_result.json
-trusted_metrics.json
-verdict.json
-audit_report.md
-manifest.json
-```
 
 ## Honest Scope
 
