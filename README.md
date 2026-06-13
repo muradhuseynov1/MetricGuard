@@ -11,6 +11,14 @@ Run the full MVP demo:
 python3 demo.py --scenario cheating_then_repair
 ```
 
+Run only one branch:
+
+```bash
+python3 demo.py --scenario cheating_then_repair --run-scope rejected
+python3 demo.py --scenario cheating_then_repair --run-scope accepted
+python3 demo.py --scenario cheating_then_repair --run-scope both
+```
+
 The demo creates:
 
 - a trusted baseline metric

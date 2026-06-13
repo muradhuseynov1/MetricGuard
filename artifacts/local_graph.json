@@ -41,36 +41,6 @@
         "cheat\\audit\\manifest.json"
       ],
       "parent_id": "proposal-cheat"
-    },
-    {
-      "id": "proposal-repair",
-      "kind": "proposal",
-      "title": "Blue repair: legitimate threshold change",
-      "status": "claimed",
-      "summary": "Reported accuracy: 80.00%",
-      "artifacts": [
-        "repair\\proposal.json"
-      ],
-      "parent_id": "baseline"
-    },
-    {
-      "id": "audit-accepted",
-      "kind": "audit",
-      "title": "Red audit: accepted",
-      "status": "accepted",
-      "summary": "trusted rerun confirmed a real improvement without policy violations",
-      "artifacts": [
-        "repair\\patch.diff",
-        "repair\\proposal.json",
-        "repair\\audit\\audit_result.json",
-        "repair\\audit\\trusted_metrics.json",
-        "repair\\audit\\verdict.json",
-        "repair\\audit\\llm_judge.json",
-        "repair\\audit\\llm_judge.md",
-        "repair\\audit\\audit_report.md",
-        "repair\\audit\\manifest.json"
-      ],
-      "parent_id": "proposal-repair"
     }
   ]
 }
