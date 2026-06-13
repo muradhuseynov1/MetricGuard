@@ -1,60 +1,38 @@
 # MetricGuard
 
-MetricGuard is a Flywheel-native integrity gate for agentic research claims.
-It treats a generated benchmark or citation claim as untrusted until it survives
-deterministic checks, trusted reruns, evidence artifacts, and a graph-backed
-verdict.
-
-The short version:
-
-> MetricGuard is not another autonomous optimizer. It is the integrity gate that
-> decides whether an optimizer's claimed improvement can be trusted.
-
-## Why It Exists
-
-Agentic coding and research systems are often judged by scalar outputs:
-accuracy, benchmark score, test pass rate, citation count, or answer quality.
-That creates an obvious failure mode: the agent may improve the metric by
-corrupting the measurement process instead of solving the task.
-
-MetricGuard demonstrates a concrete trust boundary:
+MetricGuard is a Flywheel-native integrity gate for agentic research claims. It
+does not optimize a benchmark; it decides whether a claimed improvement or cited
+answer can be trusted.
 
 ```text
 claim -> audit -> evidence -> verdict -> repair -> benchmark
 ```
 
-It currently covers two demo domains:
+MetricGuard records rejected claims, accepted repairs, audit artifacts, and
+benchmark results as a connected Flywheel evidence graph.
 
-- benchmark integrity: reject evaluator tampering, hidden-label access, and fake reported metrics
-- citation integrity: reject nonexistent citations, metadata mismatches, fake quotes, unsupported claims, and no-evidence citations
+## What It Checks
 
-## Demo Command
+MetricGuard currently demonstrates two trust boundaries:
 
-For the cleanest end-to-end demo, run the full citation validation pipeline:
+- **Benchmark integrity**: detects evaluator tampering, hidden-label access, fake reported metrics, and failed trusted reruns.
+- **Citation integrity**: detects nonexistent DOI/URL targets, metadata mismatches, fake quotes, unsupported claims, and no-evidence citations.
 
-```powershell
-python demo.py --scenario citation_validation_pipeline --live-citation-checks --graph-backend flywheel-cli
-```
+## Best Demo Command
 
-This creates one connected Flywheel evidence graph:
-
-```text
-Citation repair demo
-|-- fabricated citation
-|   `-- rejected audit
-`-- repaired citation
-    `-- accepted audit
-        `-- synthetic citation benchmark
-            `-- external SciFact subset
-```
-
-Local-only version:
+Run the full citation validation pipeline locally:
 
 ```powershell
 python demo.py --scenario citation_validation_pipeline --graph-backend local
 ```
 
-Expected local output:
+Run the same pipeline and sync it to Flywheel:
+
+```powershell
+python demo.py --scenario citation_validation_pipeline --live-citation-checks --graph-backend flywheel-cli
+```
+
+Expected output:
 
 ```text
 Citation repair: REJECTED then ACCEPTED
@@ -62,92 +40,38 @@ Synthetic benchmark: 6/6 (100.0%)
 External SciFact subset: 9/9 (100.0%)
 ```
 
-## Quick Start
+The pipeline creates this graph shape:
 
-Requirements:
-
-- Python 3.11+
-- no required third-party Python packages
-- optional: Node.js / `npx` for Flywheel CLI sync
-
-Run the original benchmark-integrity MVP:
-
-```powershell
-python demo.py --scenario cheating_then_repair --graph-backend local
-```
-
-Run the citation repair demo:
-
-```powershell
-python demo.py --scenario fake_citations --graph-backend local
-```
-
-Run the synthetic citation benchmark:
-
-```powershell
-python demo.py --scenario citation_benchmark --graph-backend local
-```
-
-Run the external SciFact subset:
-
-```powershell
-python demo.py --scenario external_scifact_subset --graph-backend local
+```text
+fabricated citation -> rejected audit
+repaired citation -> accepted audit
+accepted audit -> synthetic benchmark
+synthetic benchmark -> external SciFact subset
 ```
 
 ## Scenarios
 
-### `cheating_then_repair`
+| Scenario | Purpose |
+|---|---|
+| `cheating_then_repair` | Original benchmark-integrity demo: reject a cheating patch, accept a repaired patch. |
+| `fake_citations` | Reject a fabricated citation answer, accept a repaired supported answer. |
+| `citation_benchmark` | Seeded synthetic citation benchmark with six representative failure modes. |
+| `external_scifact_subset` | Fixed nine-example SciFact dev subset for external validation. |
+| `citation_validation_pipeline` | Recommended end-to-end graph combining repair, synthetic benchmark, and SciFact subset. |
 
-This is the original MetricGuard MVP. A Blue proposer claims a dramatic accuracy
-improvement, but the patch tampers with `evaluate.py`, probes for hidden labels,
-and reports a fake metric. The Red auditor rejects it. A repaired patch is then
-accepted after a trusted rerun.
+Examples:
 
-Checks:
-
-- protected file diff check
-- forbidden path scan
-- hidden test run
-- reported metric vs trusted metric comparison
-- hash manifest generation
-- optional LLM judge explanation artifact
-
-Expected:
-
-```text
-Cheating claim verdict: REJECTED
-Repair claim verdict: ACCEPTED
+```powershell
+python demo.py --scenario cheating_then_repair --graph-backend local
+python demo.py --scenario citation_benchmark --graph-backend local
+python demo.py --scenario external_scifact_subset --graph-backend local
 ```
 
-### `fake_citations`
+## Benchmark Results
 
-This creates a seeded fabricated citation answer and a repaired citation answer.
-The bad answer includes a nonexistent DOI, an invalid URL, fake metadata, and an
-unsupported claim. The repaired answer cites a local trusted fixture.
+### Synthetic Citation Benchmark
 
-Artifacts are written under:
-
-```text
-artifacts/citations/
-```
-
-Important files:
-
-```text
-bad_answer.md
-repaired_answer.md
-fake_citations_rejected/extracted_citations.json
-fake_citations_rejected/deterministic_verification.json
-fake_citations_rejected/live_citation_resolution.json
-fake_citations_rejected/judge_report.md
-fake_citations_rejected/verdict.json
-fake_citations_repaired/verdict.json
-```
-
-### `citation_benchmark`
-
-This is a seeded synthetic benchmark created for this project. It is not an
-industry benchmark. It tests representative citation-integrity failure modes.
+This is a seeded project-specific benchmark, not an industry benchmark.
 
 Cases:
 
@@ -160,15 +84,7 @@ overclaimed_support
 missing_citation
 ```
 
-Metrics:
-
-```text
-accuracy
-cheat_detection_rate
-false_reject_rate
-```
-
-Current expected result:
+Expected result:
 
 ```text
 Cases correct: 6/6
@@ -177,35 +93,21 @@ Cheat detection rate: 100.0%
 False reject rate: 0.0%
 ```
 
-Artifacts are written under:
+Artifacts:
 
 ```text
 artifacts/citation_benchmark/
 ```
 
-### `external_scifact_subset`
+### External SciFact Subset
 
-This adapts a fixed nine-example subset of the SciFact dev set. It is the
-external benchmark layer for the demo.
+MetricGuard also evaluates a fixed nine-example subset of SciFact dev:
 
-Subset composition:
+- 3 `SUPPORT` examples
+- 3 `CONTRADICT` examples
+- 3 no-annotated-evidence examples
 
-- 3 SciFact `SUPPORT` examples
-- 3 SciFact `CONTRADICT` examples
-- 3 examples with no annotated supporting evidence
-
-MetricGuard accepts the supported citations and rejects contradicting or
-unsupported citations.
-
-Metrics:
-
-```text
-accuracy
-unsupported_detection_rate
-false_reject_rate
-```
-
-Current expected result:
+Expected result:
 
 ```text
 Cases correct: 9/9
@@ -214,98 +116,82 @@ Unsupported detection rate: 100.0%
 False reject rate: 0.0%
 ```
 
-The fixed subset lives at:
+Fixed subset:
 
 ```text
 benchmarks/external_scifact_subset.jsonl
 ```
 
-Generated artifacts are written under:
+Artifacts:
 
 ```text
 artifacts/external_scifact_subset/
 ```
 
-### `citation_validation_pipeline`
+## Metric Meanings
 
-This is the recommended end-to-end scenario. It runs the citation repair demo,
-then derives the synthetic benchmark from the accepted citation audit, then
-derives the external SciFact subset from the benchmark node.
-
-This scenario avoids manual node ID passing because the accepted node is known
-inside the running graph construction process.
+| Metric | Meaning |
+|---|---|
+| `unsupported_detection_rate` | Bad, contradicting, fake, or no-evidence citations correctly rejected. |
+| `cheat_detection_rate` | Synthetic citation failures correctly rejected. |
+| `false_reject_rate` | Valid supported citations incorrectly rejected. |
+| `accuracy` | Overall accept/reject correctness. |
 
 ## Citation Verification
 
-Citation verification is implemented in:
+Implemented in:
 
 ```text
 metricguard/citations.py
 ```
 
-The citation auditor performs:
+Checks:
 
-- citation extraction from footnote-style Markdown
-- source existence check against the trusted local source registry
-- DOI or URL match check
-- title/year/journal/author metadata check
-- direct quote presence check
-- claimed entity check
-- judge-style support check for unsupported or overclaimed statements
-- optional live DOI/URL resolution
+- extracts Markdown footnote citations
+- validates source existence against a trusted registry
+- checks DOI/URL, title, year, journal, and authors
+- verifies direct quotes when present
+- checks whether the source supports or overclaims the cited statement
+- optionally resolves public DOI/URL targets live
 
-Live DOI/URL resolution is evidence-only by default:
+Live DOI/URL checks are evidence-only by default:
 
 ```powershell
 python demo.py --scenario fake_citations --live-citation-checks --graph-backend local
 ```
 
-To make failed live DOI/URL probes affect the verdict:
+To make failed live probes affect verdicts:
 
 ```powershell
 python demo.py --scenario fake_citations --enforce-live-citation-checks --graph-backend local
 ```
 
-The live resolver writes:
+Live evidence is written to:
 
 ```text
 live_citation_resolution.json
 ```
 
-For example, a fake DOI produces evidence such as:
+## Benchmark Integrity Checks
+
+Implemented in:
 
 ```text
-HEAD https://doi.org/10.1038/s42256-025-99999-9 -> HTTP 404
+metricguard/red_auditor.py
+metricguard/trusted_eval.py
 ```
 
-## Metric Meanings
+Checks:
 
-For citation and SciFact-style validation, the most important metrics are:
+- protected file diff check
+- forbidden hidden-path scan
+- hidden test execution
+- trusted metric recomputation
+- reported-vs-trusted metric comparison
+- manifest generation
+- optional LLM judge explanation artifact
 
-```text
-unsupported_detection_rate
-```
-
-How many unsupported, contradicting, fake, or no-evidence citations were
-correctly rejected.
-
-```text
-false_reject_rate
-```
-
-How many valid supported citations were incorrectly rejected.
-
-```text
-accuracy
-```
-
-Total correct accept/reject decisions.
-
-For the seeded synthetic benchmark, the equivalent rejection metric is named:
-
-```text
-cheat_detection_rate
-```
+The LLM judge never overrides the deterministic verdict.
 
 ## Flywheel Integration
 
@@ -316,62 +202,33 @@ artifacts/local_graph.json
 artifacts/local_graph.md
 ```
 
-To sync a live graph through the Flywheel CLI, configure `.env`:
+To sync a live graph through Flywheel CLI, configure:
 
 ```env
 FLYWHEEL_ROOT_NODE_ID=replace-with-your-flywheel-root-node-id
 ```
 
-Then run any scenario with:
+Then run:
 
 ```powershell
 python demo.py --scenario citation_validation_pipeline --live-citation-checks --graph-backend flywheel-cli
 ```
 
-The Flywheel CLI backend:
+The Flywheel backend:
 
-- creates committed Flywheel nodes
+- creates committed nodes
 - connects parent-child evidence branches
-- writes artifact paths into node content
-- uploads generated files as real Flywheel artifacts
-- writes sync results to `artifacts/flywheel_sync.json`
+- uploads generated files as Flywheel artifacts
+- writes sync details to `artifacts/flywheel_sync.json`
 
-To attach a run under a specific existing Flywheel node:
+For manual continuation from an existing node:
 
 ```powershell
 python demo.py --scenario external_scifact_subset --graph-backend flywheel-cli --flywheel-parent-node-id <NODE_ID>
 ```
 
-For a full pipeline demo, manual parent passing is usually unnecessary because
-the pipeline creates the accepted citation audit and derives later benchmark
-nodes from it in the same run.
-
-## LLM Judge
-
-Benchmark integrity audits can include an optional LLM judge explanation. This
-does not override deterministic verdicts.
-
-Implementation:
-
-```text
-metricguard/llm_judge.py
-```
-
-Behavior:
-
-- if `OPENAI_API_KEY` is not configured, it writes a skipped artifact
-- if configured, it calls the OpenAI Responses API and writes:
-
-```text
-llm_judge.json
-llm_judge.md
-```
-
-Disable it:
-
-```powershell
-$env:METRICGUARD_LLM_JUDGE="0"
-```
+The full pipeline usually does not need manual parent IDs because it creates the
+accepted node and later benchmark branches in one run.
 
 ## Repository Layout
 
@@ -379,43 +236,24 @@ $env:METRICGUARD_LLM_JUDGE="0"
 MetricGuard/
 |-- demo.py
 |-- README.md
-|-- requirements.txt
 |-- metricguard/
-|   |-- benchmark.py
-|   |-- blue.py
-|   |-- citation_benchmark.py
 |   |-- citations.py
+|   |-- citation_benchmark.py
 |   |-- external_scifact.py
 |   |-- flywheel_graph.py
-|   |-- hashing.py
-|   |-- llm_judge.py
 |   |-- red_auditor.py
-|   |-- report.py
-|   `-- trusted_eval.py
+|   |-- trusted_eval.py
+|   `-- ...
 |-- toy_repo/
-|   |-- model.py
-|   |-- train.py
-|   |-- evaluate.py
-|   |-- data/
-|   `-- tests/
 |-- trusted_assets/
-|   `-- hidden_labels.csv
 |-- benchmarks/
-|   |-- external_scifact_subset.jsonl
-|   `-- raw/
+|   `-- external_scifact_subset.jsonl
 `-- artifacts/
-    |-- local_graph.json
-    |-- local_graph.md
-    |-- citations/
-    |-- citation_benchmark/
-    |-- external_scifact_subset/
-    |-- cheat/
-    `-- repair/
 ```
 
-## Evidence Artifacts
+## Key Artifacts
 
-MetricGuard writes evidence for each claim and audit:
+Typical evidence files:
 
 ```text
 proposal.json
@@ -431,53 +269,14 @@ audit_report.md
 manifest.json
 ```
 
-Not every scenario uses every artifact type. For example, benchmark integrity
-uses `trusted_metrics.json`, while citation scenarios use extracted citation and
-source-support artifacts.
+## Honest Scope
 
-## End-to-End Output
+- `citation_benchmark` is a seeded synthetic benchmark.
+- `external_scifact_subset` is a fixed nine-example SciFact dev subset, not a full SciFact evaluation.
+- MetricGuard uses trusted reruns, not a secure sandbox.
+- Manifests are hash-verifiable, not a cryptographic ledger.
+- LLM judge output is explanatory; deterministic checks decide the verdict.
 
-The full citation validation pipeline produces a connected evidence graph and a
-set of local artifacts. A successful run prints:
+Generated commands rewrite `artifacts/`. Do not commit local secrets such as
+`.env`.
 
-```text
-Citation repair: REJECTED then ACCEPTED
-Synthetic benchmark: 6/6 (100.0%)
-External SciFact subset: 9/9 (100.0%)
-```
-
-The corresponding graph structure is:
-
-```text
-fabricated citation -> rejected audit
-repaired citation -> accepted audit
-accepted audit -> synthetic benchmark
-synthetic benchmark -> external SciFact subset
-```
-
-This structure is the central project claim: MetricGuard does not only record
-successful outputs. It records failed claims, rejected evidence, accepted
-repairs, benchmark results, and the artifacts behind each verdict.
-
-## Honest Claims
-
-Use:
-
-- "seeded synthetic benchmark" for `citation_benchmark`
-- "fixed nine-example SciFact dev subset" for `external_scifact_subset`
-- "trusted rerun" rather than "secure sandbox"
-- "hash-verifiable manifest" rather than "cryptographic ledger"
-- "LLM judge explanation" rather than "LLM decides the verdict"
-
-Avoid claiming:
-
-- that the synthetic benchmark is an industry benchmark
-- that the SciFact subset is a full benchmark evaluation
-- that local trusted fixtures are public DOI records
-- that the system is a secure sandbox
-
-## Generated Outputs
-
-Most commands rewrite `artifacts/`. That is expected. In public repositories,
-commit only the artifacts that are useful as reproducible examples and do not
-commit local secrets such as `.env`.
