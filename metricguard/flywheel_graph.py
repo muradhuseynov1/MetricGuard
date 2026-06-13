@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.error
-import urllib.request
+import shutil
+import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -34,8 +34,9 @@ class LocalGraph:
         summary: str,
         artifacts: list[str],
         parent_id: str | None = None,
+        node_id: str | None = None,
     ) -> None:
-        node_id = _node_id(kind, title)
+        node_id = node_id or _node_id(kind, title)
         self.nodes.append(
             GraphNode(
                 id=node_id,
@@ -71,129 +72,262 @@ class LocalGraph:
 
 @dataclass(frozen=True)
 class FlywheelConfig:
-    base_url: str
-    api_token: str
-    project_id: str
-    nodes_path: str = "/nodes"
-    edges_path: str = "/edges"
-    timeout_seconds: int = 20
+    root_node_id: str | None = None
+    parent_node_id: str | None = None
+    updated_by: str = "MetricGuard"
+    repo_url: str | None = None
+    branch_name: str | None = None
+    head_commit_sha: str | None = None
+    origin_host: str = "local-script"
+    external_transcript_ref: str | None = None
 
     @classmethod
-    def from_env(cls) -> "FlywheelConfig | None":
+    def from_env(cls, parent_node_id: str | None = None) -> "FlywheelConfig":
         _load_dotenv(Path(__file__).resolve().parents[1] / ".env")
-        base_url = os.environ.get("FLYWHEEL_API_BASE_URL")
-        api_token = os.environ.get("FLYWHEEL_API_TOKEN")
-        project_id = os.environ.get("FLYWHEEL_PROJECT_ID")
-        if not (base_url and api_token and project_id):
-            return None
         return cls(
-            base_url=base_url.rstrip("/"),
-            api_token=api_token,
-            project_id=project_id,
-            nodes_path=os.environ.get("FLYWHEEL_NODES_PATH", "/nodes"),
-            edges_path=os.environ.get("FLYWHEEL_EDGES_PATH", "/edges"),
-            timeout_seconds=int(os.environ.get("FLYWHEEL_TIMEOUT_SECONDS", "20")),
+            root_node_id=os.environ.get("FLYWHEEL_ROOT_NODE_ID"),
+            parent_node_id=parent_node_id or os.environ.get("FLYWHEEL_PARENT_NODE_ID"),
+            updated_by=os.environ.get("FLYWHEEL_UPDATED_BY", "MetricGuard"),
+            repo_url=os.environ.get("FLYWHEEL_REPO_URL"),
+            branch_name=os.environ.get("FLYWHEEL_BRANCH_NAME"),
+            head_commit_sha=os.environ.get("FLYWHEEL_HEAD_COMMIT_SHA"),
+            origin_host=os.environ.get("FLYWHEEL_ORIGIN_HOST", "local-script"),
+            external_transcript_ref=os.environ.get("FLYWHEEL_EXTERNAL_TRANSCRIPT_REF"),
         )
 
 
 class FlywheelGraph(LocalGraph):
-    """Local graph mirror plus best-effort live Flywheel sync."""
+    """Local graph mirror plus best-effort Flywheel CLI node creation."""
 
-    def __init__(self, artifacts_dir: Path, config: FlywheelConfig) -> None:
+    def __init__(
+        self,
+        artifacts_dir: Path,
+        config: FlywheelConfig,
+        create_node: Any | None = None,
+    ) -> None:
         super().__init__(artifacts_dir)
         self.config = config
+        self._create_node = create_node or self._create_node_with_cli
         self.sync_events: list[dict[str, Any]] = []
+        self.local_to_flywheel: dict[str, str] = {}
 
     def write(self) -> None:
         super().write()
         for node in self.nodes:
             self._sync_node(node)
-            if node.parent_id:
-                self._sync_edge(node.parent_id, node.id)
         self._write_sync_report()
 
     def _sync_node(self, node: GraphNode) -> None:
-        payload = {
-            "project_id": self.config.project_id,
-            "external_id": node.id,
-            "kind": node.kind,
-            "title": node.title,
-            "status": node.status,
-            "summary": node.summary,
-            "artifacts": node.artifacts,
-            "parent_id": node.parent_id,
-            "metadata": {"source": "MetricGuard", "graph": "claim-audit-evidence-verdict"},
-        }
-        self._post("node", self.config.nodes_path, payload)
-
-    def _sync_edge(self, source_id: str, target_id: str) -> None:
-        payload = {
-            "project_id": self.config.project_id,
-            "source_external_id": source_id,
-            "target_external_id": target_id,
-            "relationship": "evidence_transition",
-            "metadata": {"source": "MetricGuard"},
-        }
-        self._post("edge", self.config.edges_path, payload)
-
-    def _post(self, item_type: str, path_template: str, payload: dict[str, Any]) -> None:
-        path = path_template.format(project_id=self.config.project_id).lstrip("/")
-        url = f"{self.config.base_url}/{path}"
-        body = json.dumps(payload).encode("utf-8")
-        request = urllib.request.Request(
-            url,
-            data=body,
-            method="POST",
-            headers={
-                "Authorization": f"Bearer {self.config.api_token}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-        )
         try:
-            with urllib.request.urlopen(request, timeout=self.config.timeout_seconds) as response:
-                response_body = response.read().decode("utf-8", errors="replace")
-                self.sync_events.append(
-                    {
-                        "type": item_type,
-                        "id": payload.get("external_id") or payload.get("target_external_id"),
-                        "url": url,
-                        "ok": 200 <= response.status < 300,
-                        "status": response.status,
-                        "response": _trim(response_body),
-                    }
-                )
-        except urllib.error.HTTPError as exc:
+            parent_ids = self._parent_ids_for(node)
+        except RuntimeError as exc:
             self.sync_events.append(
                 {
-                    "type": item_type,
-                    "id": payload.get("external_id") or payload.get("target_external_id"),
-                    "url": url,
-                    "ok": False,
-                    "status": exc.code,
-                    "response": _trim(exc.read().decode("utf-8", errors="replace")),
-                }
-            )
-        except urllib.error.URLError as exc:
-            self.sync_events.append(
-                {
-                    "type": item_type,
-                    "id": payload.get("external_id") or payload.get("target_external_id"),
-                    "url": url,
+                    "type": "node",
+                    "local_id": node.id,
                     "ok": False,
                     "status": None,
-                    "response": str(exc.reason),
+                    "response": str(exc),
+                    "parent_ids": [],
                 }
             )
+            return
+
+        payload = self._node_payload(node, parent_ids)
+        try:
+            response = self._create_node(payload)
+            flywheel_node = response.get("node", {})
+            flywheel_node_id = flywheel_node.get("node_id")
+            if not flywheel_node_id:
+                raise RuntimeError(f"Flywheel response did not include node.node_id: {response}")
+            self.local_to_flywheel[node.id] = str(flywheel_node_id)
+            self.sync_events.append(
+                {
+                    "type": "node",
+                    "local_id": node.id,
+                    "flywheel_node_id": str(flywheel_node_id),
+                    "slug_name": flywheel_node.get("slug_name"),
+                    "ok": True,
+                    "status": "created",
+                    "response": _trim(json.dumps(response)),
+                    "parent_ids": parent_ids,
+                }
+            )
+            self._upload_node_artifacts(str(flywheel_node_id), node)
+        except Exception as exc:
+            self.sync_events.append(
+                {
+                    "type": "node",
+                    "local_id": node.id,
+                    "ok": False,
+                    "status": None,
+                    "response": _trim(str(exc)),
+                    "parent_ids": parent_ids,
+                }
+            )
+
+    def _parent_ids_for(self, node: GraphNode) -> list[str]:
+        if node.parent_id:
+            parent_node_id = self.local_to_flywheel.get(node.parent_id)
+            if not parent_node_id:
+                raise RuntimeError(
+                    f"cannot create {node.id}: parent {node.parent_id} was not synced"
+                )
+            return [parent_node_id]
+        if self.config.parent_node_id:
+            return [self.config.parent_node_id]
+        if self.config.root_node_id:
+            return [self.config.root_node_id]
+        return []
+
+    def _node_payload(self, node: GraphNode, parent_ids: list[str]) -> dict[str, Any]:
+        content_lines = [
+            f"# {node.title}",
+            "",
+            f"- Local node id: `{node.id}`",
+            f"- Kind: `{node.kind}`",
+            f"- Status: `{node.status}`",
+            f"- Summary: {node.summary}",
+        ]
+        if node.artifacts:
+            content_lines.extend(
+                [
+                    "",
+                    "## Evidence Artifacts",
+                    *[f"- `{artifact}`" for artifact in node.artifacts],
+                ]
+            )
+        llm_explanation = self._read_llm_judge_artifact(node)
+        if llm_explanation:
+            content_lines.extend(["", llm_explanation])
+        return {
+            "local_temp_node_id": f"metricguard-{node.id}",
+            "parent_ids": parent_ids,
+            "staged_payload": {
+                "title": node.title,
+                "summary": node.summary,
+                "content": "\n".join(content_lines),
+                "repo_context": {
+                    "repo_url": self.config.repo_url,
+                    "branch_name": self.config.branch_name,
+                    "head_commit_sha": self.config.head_commit_sha,
+                    "origin_host": self.config.origin_host,
+                    "updated_by": self.config.updated_by,
+                    "external_transcript_ref": self.config.external_transcript_ref,
+                },
+            },
+        }
+
+    def _read_llm_judge_artifact(self, node: GraphNode) -> str | None:
+        for artifact in node.artifacts:
+            normalized = artifact.replace("\\", "/")
+            if normalized.endswith("llm_judge.md"):
+                path = self.artifacts_dir / Path(normalized)
+                if path.exists():
+                    return path.read_text(encoding="utf-8").strip()
+        return None
+
+    def _create_node_with_cli(self, payload: dict[str, Any]) -> dict[str, Any]:
+        payload_dir = self.artifacts_dir / "flywheel_payloads"
+        payload_dir.mkdir(parents=True, exist_ok=True)
+        payload_path = payload_dir / f"{payload['local_temp_node_id']}.json"
+        payload_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        command = [
+            *_flywheel_command(),
+            "nodes:commit-new",
+            f"--payload_json=@{payload_path}",
+        ]
+        try:
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as exc:
+            details = (exc.stderr or exc.stdout or str(exc)).strip()
+            raise RuntimeError(f"Flywheel CLI command failed: {details}") from exc
+        return json.loads(result.stdout)
+
+    def _upload_node_artifacts(self, flywheel_node_id: str, node: GraphNode) -> None:
+        items: list[dict[str, str]] = []
+        for artifact in node.artifacts:
+            path = self.artifacts_dir / Path(artifact.replace("\\", "/"))
+            if not path.exists():
+                self.sync_events.append(
+                    {
+                        "type": "artifact",
+                        "local_id": node.id,
+                        "flywheel_node_id": flywheel_node_id,
+                        "artifact": artifact,
+                        "ok": False,
+                        "status": "missing",
+                        "response": "local artifact path does not exist",
+                    }
+                )
+                continue
+            items.append(
+                {
+                    "local_path": str(path),
+                    "artifact_type": _artifact_type(path),
+                    "title": _artifact_title(artifact),
+                }
+            )
+        if not items:
+            return
+
+        items_dir = self.artifacts_dir / "flywheel_payloads"
+        items_dir.mkdir(parents=True, exist_ok=True)
+        items_path = items_dir / f"metricguard-{node.id}-artifacts.json"
+        items_path.write_text(json.dumps(items, indent=2) + "\n", encoding="utf-8")
+
+        revision = self._get_node_revision(flywheel_node_id)
+        command = [
+            *_flywheel_command(),
+            "artifacts:upload",
+            "--node_id",
+            flywheel_node_id,
+            "--expected_revision",
+            str(revision),
+            f"--items=@{items_path}",
+        ]
+        try:
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as exc:
+            details = (exc.stderr or exc.stdout or str(exc)).strip()
+            raise RuntimeError(f"Flywheel artifact upload failed for {node.id}: {details}") from exc
+        self.sync_events.append(
+            {
+                "type": "artifacts",
+                "local_id": node.id,
+                "flywheel_node_id": flywheel_node_id,
+                "count": len(items),
+                "items_file": str(items_path),
+                "ok": True,
+                "status": "uploaded",
+                "response": _trim(result.stdout),
+            }
+        )
+
+    def _get_node_revision(self, flywheel_node_id: str) -> int:
+        command = [
+            *_flywheel_command(),
+            "nodes:get",
+            "--node_id",
+            flywheel_node_id,
+            "--format",
+            "json",
+        ]
+        try:
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as exc:
+            details = (exc.stderr or exc.stdout or str(exc)).strip()
+            raise RuntimeError(f"Flywheel nodes:get failed for {flywheel_node_id}: {details}") from exc
+        payload = json.loads(result.stdout)
+        return int(payload["revision"])
 
     def _write_sync_report(self) -> None:
         report = {
-            "backend": "flywheel",
-            "base_url": self.config.base_url,
-            "project_id": self.config.project_id,
-            "nodes_path": self.config.nodes_path,
-            "edges_path": self.config.edges_path,
+            "backend": "flywheel-cli",
+            "root_node_id": self.config.root_node_id,
+            "parent_node_id": self.config.parent_node_id,
             "ok": bool(self.sync_events) and all(event["ok"] for event in self.sync_events),
+            "local_to_flywheel": self.local_to_flywheel,
             "events": self.sync_events,
         }
         (self.artifacts_dir / "flywheel_sync.json").write_text(
@@ -202,21 +336,16 @@ class FlywheelGraph(LocalGraph):
         )
 
 
-def create_graph(artifacts_dir: Path, backend: str = "auto") -> LocalGraph:
-    if backend not in {"auto", "local", "flywheel"}:
+def create_graph(artifacts_dir: Path, backend: str = "auto", parent_node_id: str | None = None) -> LocalGraph:
+    if backend not in {"auto", "local", "flywheel", "flywheel-cli"}:
         raise ValueError(f"unknown graph backend: {backend}")
-    config = FlywheelConfig.from_env()
+    config = FlywheelConfig.from_env(parent_node_id=parent_node_id)
     if backend == "local":
         return LocalGraph(artifacts_dir)
-    if config:
+    if backend in {"flywheel", "flywheel-cli"}:
         return FlywheelGraph(artifacts_dir, config)
-    if backend == "flywheel":
-        missing = ", ".join(
-            name
-            for name in ("FLYWHEEL_API_BASE_URL", "FLYWHEEL_API_TOKEN", "FLYWHEEL_PROJECT_ID")
-            if not os.environ.get(name)
-        )
-        raise RuntimeError(f"Flywheel backend requested but missing environment variables: {missing}")
+    if config.root_node_id:
+        return FlywheelGraph(artifacts_dir, config)
     return LocalGraph(artifacts_dir)
 
 
@@ -224,6 +353,26 @@ def _node_id(kind: str, title: str) -> str:
     lower = title.lower()
     if kind == "baseline":
         return "baseline"
+    if kind == "proposal" and lower.startswith("benchmark case:"):
+        return "proposal-benchmark-" + _slug(lower.removeprefix("benchmark case:").strip())
+    if kind == "audit" and lower.startswith("benchmark audit:"):
+        parts = lower.removeprefix("benchmark audit:").strip().split()
+        case_id = " ".join(parts[:-1]) if len(parts) > 1 else "case"
+        return "audit-benchmark-" + _slug(case_id)
+    if kind == "proposal" and lower.startswith("scifact case:"):
+        return "proposal-scifact-" + _slug(lower.removeprefix("scifact case:").strip())
+    if kind == "audit" and lower.startswith("scifact audit:"):
+        parts = lower.removeprefix("scifact audit:").strip().split()
+        case_id = " ".join(parts[:-1]) if len(parts) > 1 else "case"
+        return "audit-scifact-" + _slug(case_id)
+    if kind == "proposal" and "fabricated citations" in lower:
+        return "proposal-citation-fake"
+    if kind == "proposal" and "verified citation" in lower:
+        return "proposal-citation-repair"
+    if kind == "audit" and "citation" in lower and "accepted" in lower:
+        return "audit-citation-accepted"
+    if kind == "audit" and "citation" in lower and "rejected" in lower:
+        return "audit-citation-rejected"
     if kind == "proposal" and "repair" in lower:
         return "proposal-repair"
     if kind == "proposal":
@@ -235,11 +384,47 @@ def _node_id(kind: str, title: str) -> str:
     return f"{kind}-{len(title)}"
 
 
+def _slug(value: str) -> str:
+    normalized = []
+    for char in value.lower():
+        normalized.append(char if char.isalnum() else "-")
+    slug = "".join(normalized).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug or "node"
+
+
 def _trim(value: str, limit: int = 1000) -> str:
     if len(value) <= limit:
         return value
     return value[:limit] + "...[trimmed]"
 
+
+def _artifact_type(path: Path) -> str:
+    if path.suffix.lower() == ".json":
+        return "json"
+    return "text"
+
+
+def _artifact_title(path: str) -> str:
+    return Path(path).name.replace("_", " ").replace("-", " ")
+
+
+def _flywheel_command() -> list[str]:
+    flywheel_candidates = ["flywheel.cmd", "flywheel.exe", "flywheel"] if os.name == "nt" else ["flywheel"]
+    for candidate in flywheel_candidates:
+        command = shutil.which(candidate)
+        if command:
+            return [command]
+    npx_candidates = ["npx.cmd", "npx"] if os.name == "nt" else ["npx"]
+    for candidate in npx_candidates:
+        command = shutil.which(candidate)
+        if command:
+            return [command, "--yes", "@paradigma-inc/flywheel"]
+    raise RuntimeError(
+        "Flywheel CLI was not found on PATH. Install/configure it with: "
+        "npx --yes @paradigma-inc/flywheel setup --mode cli"
+    )
 
 
 def _load_dotenv(path: Path) -> None:

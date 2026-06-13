@@ -2,3 +2,16 @@ __pycache__/
 *.py[cod]
 .env
 .env.local
+.agents/
+.flywheel/
+skills-lock.json
+file.json
+
+# Downloaded source datasets. Keep fixed subsets under benchmarks/.
+benchmarks/raw/
+
+# Generated runtime artifacts and Flywheel sync payloads.
+artifacts/flywheel_payloads/
+artifacts/flywheel_sync.json
+artifacts/flywheel_cli_sync.json
+artifacts/project_context.md

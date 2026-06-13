@@ -11,6 +11,7 @@ from pathlib import Path
 from metricguard.blue import Proposal
 from metricguard.benchmark import PROJECT_ROOT
 from metricguard.hashing import write_manifest
+from metricguard.llm_judge import write_llm_judge_explanation
 from metricguard.report import write_audit_report
 from metricguard.trusted_eval import run_trusted_evaluation
 
@@ -74,6 +75,16 @@ def audit_proposal(proposal: Proposal, baseline_metric: float, artifacts_dir: Pa
         encoding="utf-8",
     )
 
+    llm_judge_paths = write_llm_judge_explanation(
+        audit_dir=audit_dir,
+        proposal=proposal,
+        checks=checks,
+        trusted_metrics=trusted_metrics_payload,
+        verdict=verdict,
+        reason=reason,
+    )
+    llm_judge_payload = json.loads(llm_judge_paths[0].read_text(encoding="utf-8"))
+
     report_path = write_audit_report(
         audit_dir=audit_dir,
         proposal=proposal,
@@ -81,6 +92,7 @@ def audit_proposal(proposal: Proposal, baseline_metric: float, artifacts_dir: Pa
         trusted_metrics=trusted_metrics_payload,
         verdict=verdict,
         reason=reason,
+        llm_judge=llm_judge_payload,
     )
 
     artifact_files = [
@@ -89,6 +101,7 @@ def audit_proposal(proposal: Proposal, baseline_metric: float, artifacts_dir: Pa
         audit_result_path,
         trusted_metrics_path,
         verdict_path,
+        *llm_judge_paths,
         report_path,
     ]
     manifest_path = write_manifest(audit_dir, artifact_files)
