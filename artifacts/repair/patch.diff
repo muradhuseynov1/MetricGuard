@@ -1,0 +1,11 @@
+--- a/toy_repo/model.py
++++ b/toy_repo/model.py
+@@ -1,7 +1,7 @@
+ from __future__ import annotations
+ 
+ 
+-THRESHOLD = 0.75
++THRESHOLD = 0.50
+ 
+ 
+ def predict(row: dict[str, str]) -> int:

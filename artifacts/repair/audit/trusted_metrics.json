@@ -1,0 +1,10 @@
+{
+  "run_id": "repair",
+  "reported_metric": 0.8,
+  "trusted_metric": 0.8,
+  "delta_reported_vs_trusted": 0.0,
+  "baseline_metric": 0.6,
+  "evaluator_hash": "f488ff019887e33ad4619798c4ff2b49c580b336e973e088dd001d5230516647",
+  "correct": 8,
+  "total": 10
+}

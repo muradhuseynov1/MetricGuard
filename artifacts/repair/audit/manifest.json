@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "path": "../repair/patch.diff",
+      "sha256": "806e59787f02e84871efb63bdf1a010f84df755674fc9134be75ac829ae8e673",
+      "bytes": 186
+    },
+    {
+      "path": "../repair/proposal.json",
+      "sha256": "6ea1fbf6edefb82a5e44f65d19bcf5b3771938b46a0dbd3a85ec71352a08287e",
+      "bytes": 307
+    },
+    {
+      "path": "audit_result.json",
+      "sha256": "889ae2ede4c3f71a0f73a9bc10ce7060a58e08a9b67adb9a882265120837893e",
+      "bytes": 614
+    },
+    {
+      "path": "trusted_metrics.json",
+      "sha256": "1702fc745cae65c2a45931f2bd03b3d66723c366149d01df4cf07c5b85fd967c",
+      "bytes": 257
+    },
+    {
+      "path": "verdict.json",
+      "sha256": "f4b22e06d4eebd0337cb8431d9958696cae093485b8a013ecb815cb172cb536f",
+      "bytes": 132
+    },
+    {
+      "path": "audit_report.md",
+      "sha256": "5997042d4c078ae2ea21b476b1a86d4a150556296a04e8ed9eb06e810425e76b",
+      "bytes": 625
+    }
+  ]
+}

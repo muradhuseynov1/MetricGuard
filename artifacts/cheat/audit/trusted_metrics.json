@@ -1,0 +1,10 @@
+{
+  "run_id": "cheat",
+  "reported_metric": 0.99,
+  "trusted_metric": 0.6,
+  "delta_reported_vs_trusted": 0.39,
+  "baseline_metric": 0.6,
+  "evaluator_hash": "f488ff019887e33ad4619798c4ff2b49c580b336e973e088dd001d5230516647",
+  "correct": 6,
+  "total": 10
+}

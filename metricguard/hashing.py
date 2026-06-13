@@ -1,0 +1,28 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_manifest(artifact_dir: Path, files: list[Path]) -> Path:
+    manifest_path = artifact_dir / "manifest.json"
+    entries = []
+    for path in files:
+        if path.name == "manifest.json":
+            continue
+        try:
+            rel = path.relative_to(artifact_dir)
+        except ValueError:
+            rel = Path("..") / path.parent.name / path.name
+        entries.append({"path": str(rel), "sha256": sha256_file(path), "bytes": path.stat().st_size})
+    manifest_path.write_text(json.dumps({"files": entries}, indent=2) + "\n", encoding="utf-8")
+    return manifest_path

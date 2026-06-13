@@ -1,0 +1,5 @@
+{
+  "verdict": "rejected",
+  "reason": "failed checks: protected_file_diff, forbidden_path_policy, hidden_test_run, metric_comparison",
+  "accepted": false
+}

@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "path": "../cheat/patch.diff",
+      "sha256": "e65124eb72b3c2ffbfdfee86d770887ce9f11902027610aa172782de433905d7",
+      "bytes": 1167
+    },
+    {
+      "path": "../cheat/proposal.json",
+      "sha256": "220ba13abb22365f366c41a936416945b4fa9e8947b57a1df814b1757223b2e9",
+      "bytes": 269
+    },
+    {
+      "path": "audit_result.json",
+      "sha256": "83e721d6bf206a3001ab5ca60f6ffaa9afdde329c4ee1ad3644ee06e058ca3ec",
+      "bytes": 941
+    },
+    {
+      "path": "trusted_metrics.json",
+      "sha256": "106646bed801fa82f3d3035380bbebd1c0e19c72bd3fa4efc13c5a624f3270ca",
+      "bytes": 258
+    },
+    {
+      "path": "verdict.json",
+      "sha256": "3a2e676112b71e04981fefe800c0f58641453e43ad547306a594e79ac2cc07b4",
+      "bytes": 158
+    },
+    {
+      "path": "audit_report.md",
+      "sha256": "858b51848f4db3a2c1450c8707786e6321e1848c6d983d97d7985038af5028d6",
+      "bytes": 951
+    }
+  ]
+}
