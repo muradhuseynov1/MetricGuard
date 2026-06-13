@@ -228,7 +228,7 @@ artifacts/external_scifact_subset/
 
 ### `citation_validation_pipeline`
 
-This is the recommended judge-facing demo. It runs the citation repair demo,
+This is the recommended end-to-end scenario. It runs the citation repair demo,
 then derives the synthetic benchmark from the accepted citation audit, then
 derives the external SciFact subset from the benchmark node.
 
@@ -435,17 +435,10 @@ Not every scenario uses every artifact type. For example, benchmark integrity
 uses `trusted_metrics.json`, while citation scenarios use extracted citation and
 source-support artifacts.
 
-## Demo Script
+## End-to-End Output
 
-Suggested presenter flow:
-
-1. Run:
-
-```powershell
-python demo.py --scenario citation_validation_pipeline --live-citation-checks --graph-backend flywheel-cli
-```
-
-2. Show terminal summary:
+The full citation validation pipeline produces a connected evidence graph and a
+set of local artifacts. A successful run prints:
 
 ```text
 Citation repair: REJECTED then ACCEPTED
@@ -453,7 +446,7 @@ Synthetic benchmark: 6/6 (100.0%)
 External SciFact subset: 9/9 (100.0%)
 ```
 
-3. Open Flywheel and show:
+The corresponding graph structure is:
 
 ```text
 fabricated citation -> rejected audit
@@ -462,13 +455,9 @@ accepted audit -> synthetic benchmark
 synthetic benchmark -> external SciFact subset
 ```
 
-4. Open one rejected audit artifact and one accepted audit artifact.
-
-5. Say:
-
-> MetricGuard does not just track what worked. It tracks what cheated, why it
-> failed, what evidence supports the verdict, and how the repaired claim holds
-> up against synthetic and external validation.
+This structure is the central project claim: MetricGuard does not only record
+successful outputs. It records failed claims, rejected evidence, accepted
+repairs, benchmark results, and the artifacts behind each verdict.
 
 ## Honest Claims
 
@@ -489,7 +478,6 @@ Avoid claiming:
 
 ## Generated Outputs
 
-Most commands rewrite `artifacts/`. That is expected. For demo submissions,
-commit only the artifacts you want reviewers to inspect and do not commit local
-secrets such as `.env`.
-
+Most commands rewrite `artifacts/`. That is expected. In public repositories,
+commit only the artifacts that are useful as reproducible examples and do not
+commit local secrets such as `.env`.
